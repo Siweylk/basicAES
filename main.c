@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 
 unsigned char SubBox[256]={
@@ -25,8 +26,9 @@ unsigned char SubBox[256]={
 };
 
 
+
 //Auxiliary functions
-void ShiftN(unsigned char* row, int n){
+void ShiftN(uint8_t* row, int n){
     
     unsigned char aux;
     int i, j;
@@ -41,53 +43,185 @@ void ShiftN(unsigned char* row, int n){
     }
 }
 
+static uint8_t xtime(uint8_t x)
+{
+  return ((x<<1) ^ (((x>>7) & 1) * 0x1b));
+}
+
 
 //Bytes transformation
-void SubBytes(unsigned char* block){
-    int ind, i;
+void SubBytes(uint8_t* block){
+
+    int i;
     for(i=0; i<16; i++){
         block[i] = SubBox[block[i]];
     }
-    return;
 }
 
-void ShiftRows(unsigned char* block){
+//Word transformation
+uint32_t SubWord(uint32_t value){
+
+    uint8_t byte1, byte2, byte3, byte4;
+
+    //Disassemble word into bytes
+    byte1 = (uint8_t)(value >> 24) & 0xFF;
+    byte2 = (uint8_t)(value >> 16) & 0xFF;
+    byte3 = (uint8_t)(value >> 8) & 0xFF; 
+    byte4 = (uint8_t)value & 0xFF;
+
+    //Substitute bytes
+    byte1 = SubBox[byte1];
+    byte2 = SubBox[byte2];
+    byte3 = SubBox[byte3];
+    byte4 = SubBox[byte4];
+
+    //Reassemble bytes
+    value |= ((uint32_t)byte1 << 24);
+    value |= ((uint32_t)byte2 << 16);
+    value |= ((uint32_t)byte3 << 8);
+    value |= (uint32_t)byte4;
+
+    return value;
+}
+
+void ShiftRows(uint8_t* block){
 
     ShiftN(&block[4], 1);
     ShiftN(&block[8], 2);
     ShiftN(&block[12], 3);
 }
 
+uint32_t RotWord(uint32_t value){
+
+    uint8_t byte1, byte2, byte3, byte4;
+
+    //Disassemble word into bytes
+    byte1 = (uint8_t)(value >> 24) & 0xFF;
+    byte2 = (uint8_t)(value >> 16) & 0xFF;
+    byte3 = (uint8_t)(value >> 8) & 0xFF; 
+    byte4 = (uint8_t)value & 0xFF;
+
+    //Reassemble reorderedbytes
+    value |= ((uint32_t)byte2 << 24);
+    value |= ((uint32_t)byte3 << 16);
+    value |= ((uint32_t)byte4 << 8);
+    value |= (uint32_t)byte1;
+
+    return value;
+}
+
+void MixColumns(uint8_t* state){
+
+    int i;
+    unsigned char tmpState[4];
+    for(i=0; i<4; i++){
+        tmpState[i] = xtime(state[i]) ^ (xtime(state[i+4]) ^ state[i+4]) ^ state[i+8] ^ state[i+12];
+        tmpState[i+4] = state[i] ^ xtime(state[i+4]) ^ (xtime(state[i+8]) ^ state[i+8])  ^ state[i+12];
+        tmpState[i+8] = state[i] ^ state[i+4] ^ xtime(state[i+8])  ^ (xtime(state[i+12]) ^ state[i+12]);
+        tmpState[i+12] = (xtime(state[i]) ^ state[i]) ^ state[i+4] ^ state[i+8]  ^ xtime(state[i+12]);
+    }
+}
+
+
+void KeyExpansion(uint8_t* key, uint32_t* w, int Nk, int Nb, int Nr){
+    
+    uint32_t temp;
+    uint32_t Rcon[10] = {0x01000000, 0x02000000, 0x04000000, 0x08000000, 0x10000000, 0x20000000, 0x40000000, 0x80000000, 0x1b000000, 0x36000000};
+    int i = 0;
+
+    while (i < Nk){
+        w[i] |= ((uint32_t)key[4*i] << 24);
+        w[i] |= ((uint32_t)key[4*i+1] << 16);
+        w[i] |= ((uint32_t)key[4*i+2] << 8);
+        w[i] |= (uint32_t)key[4*i+3];
+        i++;
+    }
+
+    i = Nk;
+
+    while (i < Nb * (Nr+1)){
+        temp = w[i-1];
+        if(i % Nk == 0){
+            temp = SubWord(RotWord(temp)) ^ Rcon[i/Nk];
+        }else if ((Nk > 6) && (i % Nk == 4)){
+            temp = SubWord(temp);
+        }
+
+        w[i] = w[i-Nk] ^ temp;
+        i++;
+    }
+}
+
+void AddRoundKey()
+
 //Cipher funtion
-void cipher(FILE* fptr, unsigned char* block){
+void cipher(FILE* fptr, uint8_t* state, uint8_t* key){
     
-    SubBytes(block);
-    ShiftRows(block);
-    
-    return;
+    SubBytes(state);
+    ShiftRows(state);
+    MixColumns(state);
+
 }
 
 
 int main(int argc, char *argv[])
 {
     FILE* fptr;
+    
     int i=0;
-    unsigned char block[17];
+    
+    uint8_t state[17];
+    uint8_t* key;
+    int key_length;
 
-    //Open file to be encrypted
+    int Nk=4;
+    int Nb=4;
+    int Nr=10;
+
+    //Check correct number of arguments(file, key)
+    if(argc != 3){
+        printf("Incorrect amount of arguments, introduce a valid file and key\n");
+        return 1;
+    }
+
+    //Check key length
+    switch(key_length){
+        case 16:
+            Nk=4;
+            Nr=10;
+            break;
+        case 24:
+            Nk=6;
+            Nr=12;
+            break;
+        case 32:
+            Nk=8;
+            Nr=14;
+            break;
+        default:
+            printf("The length of the key must be of 16, 24 or 32\n");
+            return 1;
+    }
+
+    Nb=4;
+    for(i=0; i<key_length; i++){
+        key[i] = argv[2][i];
+    }
+
+
+    //Open file to be encrypted and check if exists
     fptr = fopen(argv[1], "r");
-
-    //Checking if file exists
     if (fptr == NULL) {
         printf("The file does not exist or can not be opened");
         exit(1);
     }
 
-    while(fgets(block, 17, fptr)){
+
+    while(fgets(state, 17, fptr)){
         /*for(i=0; i<16; i++){
             printf("%c", block[i]);
         }*/
-        cipher(fptr, block);
+        cipher(fptr, state, key);
     }
 
 

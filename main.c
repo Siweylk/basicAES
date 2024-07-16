@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 
 
 unsigned char SubBox[256]={
@@ -76,7 +77,7 @@ uint32_t SubWord(uint32_t value){
     byte4 = SubBox[byte4];
 
     //Reassemble bytes
-    value |= ((uint32_t)byte1 << 24);
+    value = ((uint32_t)byte1 << 24);
     value |= ((uint32_t)byte2 << 16);
     value |= ((uint32_t)byte3 << 8);
     value |= (uint32_t)byte4;
@@ -102,9 +103,9 @@ uint32_t RotWord(uint32_t value){
     byte4 = (uint8_t)value & 0xFF;
 
     //Reassemble reorderedbytes
-    value |= ((uint32_t)byte2 << 24);
+    value =  ((uint32_t)byte2 << 24); 
     value |= ((uint32_t)byte3 << 16);
-    value |= ((uint32_t)byte4 << 8);
+    value |= ((uint32_t)byte4 << 8); 
     value |= (uint32_t)byte1;
 
     return value;
@@ -126,11 +127,11 @@ void MixColumns(uint8_t* state){
 void KeyExpansion(uint8_t* key, uint32_t* w, int Nk, int Nb, int Nr){
     
     uint32_t temp;
-    uint32_t Rcon[10] = {0x01000000, 0x02000000, 0x04000000, 0x08000000, 0x10000000, 0x20000000, 0x40000000, 0x80000000, 0x1b000000, 0x36000000};
+    uint32_t Rcon[11] = {0x00000000, 0x01000000, 0x02000000, 0x04000000, 0x08000000, 0x10000000, 0x20000000, 0x40000000, 0x80000000, 0x1b000000, 0x36000000};
     int i = 0;
 
     while (i < Nk){
-        w[i] |= ((uint32_t)key[4*i] << 24);
+        w[i] = ((uint32_t)key[4*i] << 24);
         w[i] |= ((uint32_t)key[4*i+1] << 16);
         w[i] |= ((uint32_t)key[4*i+2] << 8);
         w[i] |= (uint32_t)key[4*i+3];
@@ -146,20 +147,61 @@ void KeyExpansion(uint8_t* key, uint32_t* w, int Nk, int Nb, int Nr){
         }else if ((Nk > 6) && (i % Nk == 4)){
             temp = SubWord(temp);
         }
-
         w[i] = w[i-Nk] ^ temp;
         i++;
     }
 }
 
-void AddRoundKey()
+void AddRoundKey(uint8_t* state, uint8_t* key, uint32_t* w, int Nk, int Nb, int Nr){
+
+    KeyExpansion(key, w, Nk, Nb, Nr);
+
+    int i;
+    uint8_t byte1, byte2, byte3, byte4;
+
+    for(i=0; i<4; i++){
+        
+        //Disassemble word into bytes
+        byte1 = (uint8_t)(w[i] >> 24) & 0xFF;
+        byte2 = (uint8_t)(w[i] >> 16) & 0xFF;
+        byte3 = (uint8_t)(w[i] >> 8) & 0xFF; 
+        byte4 = (uint8_t)w[i] & 0xFF;
+
+        key[4*i] = key[4*i] ^ byte1;
+        key[(4*i) + 1] = key[(4*i) + 1] ^ byte2;
+        key[(4*i) + 2] = key[(4*i) + 2] ^ byte3;
+        key[(4*i) + 3] = key[(4*i) + 3] ^ byte4;
+
+    }
+}
 
 //Cipher funtion
-void cipher(FILE* fptr, uint8_t* state, uint8_t* key){
+void cipher(uint8_t* state, uint8_t* key, int Nk, int Nb, int Nr){
+
+    int i;
+    uint32_t w[4];
+
+    AddRoundKey(state, key, w, Nk, Nb, Nr);
     
-    SubBytes(state);
+    for(i=0; i<Nr; i++){
+        SubBytes(state);
+        ShiftRows(state);
+        MixColumns(state);
+        AddRoundKey(state, key, w, Nk, Nb, Nr);
+    }
+
+    //------------------------------------------------
+    SubBytes(state); //SEGMENTATION FAULT
+    //------------------------------------------------
+
     ShiftRows(state);
-    MixColumns(state);
+    AddRoundKey(state, key, w, Nk, Nb, Nr);
+
+    printf("Byte %d; %x2\n", i, state[1]);
+    for(i=0; i<16; i++){
+
+        printf("Byte %d; %x2\n", i, state[i]);
+    }
 
 }
 
@@ -171,7 +213,7 @@ int main(int argc, char *argv[])
     int i=0;
     
     uint8_t state[17];
-    uint8_t* key;
+    //uint8_t* key;
     int key_length;
 
     int Nk=4;
@@ -184,6 +226,7 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    key_length = strlen(argv[2]);
     //Check key length
     switch(key_length){
         case 16:
@@ -199,13 +242,13 @@ int main(int argc, char *argv[])
             Nr=14;
             break;
         default:
-            printf("The length of the key must be of 16, 24 or 32\n");
+            printf("The length of the key must be of 16, 24 or 32   %d\n", key_length);
             return 1;
     }
 
     Nb=4;
     for(i=0; i<key_length; i++){
-        key[i] = argv[2][i];
+        //key[i] = argv[2][i];
     }
 
 
@@ -221,9 +264,13 @@ int main(int argc, char *argv[])
         /*for(i=0; i<16; i++){
             printf("%c", block[i]);
         }*/
-        cipher(fptr, state, key);
+        //cipher(fptr, state, key);
     }
 
+    uint8_t sate[16]= {0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61};
+    uint8_t key[16]= {0x31, 0x31,  0x31, 0x31, 0x31, 0x31, 0x31, 0x31, 0x31, 0x31, 0x31, 0x31, 0x31, 0x31, 0x31, 0x31};
+
+    cipher(state, key, 4, 4, 10);
 
     return 0;
 }

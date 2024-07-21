@@ -26,7 +26,14 @@ unsigned char SubBox[256]={
 /*F*/   0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16 
 };
 
+void transpose(uint8_t* input, uint8_t* state){
 
+    int i;
+
+    for(i=0; i<16; i++){
+        state[i] = input[4 * (i % 4)+(i/4)];
+    }
+}
 
 //Auxiliary functions
 void ShiftN(uint8_t* row, int n){
@@ -174,10 +181,10 @@ void AddRoundKey(uint8_t* state, uint32_t* w, int ind){
             
         //printf("Bytes %d: %x%x%x%x\n", i, byte1, byte2, byte3, byte4);
         
-        state[i] ^= byte1;
-        state[i+4] ^= byte2;
-        state[i+8] ^= byte3;
-        state[i+12] ^= byte4;
+        state[4*i] ^= byte1;
+        state[4*i+1] ^= byte2;
+        state[4*i+2] ^= byte3;
+        state[4*i+3] ^= byte4;
 
     }
 
@@ -231,7 +238,6 @@ int main(int argc, char *argv[])
     int Nr=10;
 
     uint32_t w[44]; //44 poreque es 128, ajustar para resto
-
     //Check correct number of arguments(file, key)
     if(argc != 3){
         printf("Incorrect amount of arguments, introduce a valid file and key\n");
@@ -279,15 +285,13 @@ int main(int argc, char *argv[])
         //cipher(fptr, state, key);
     //}
 
-    uint8_t state[16]= {0x32, 0x43, 0xf6, 0xa8, 0x88, 0x5a, 0x30, 0x8d, 0x31, 0x31, 0x98, 0xa2, 0xe0, 0x37, 0x07, 0x34};
+    uint8_t input[16]= {0x32, 0x43, 0xf6, 0xa8, 0x88, 0x5a, 0x30, 0x8d, 0x31, 0x31, 0x98, 0xa2, 0xe0, 0x37, 0x07, 0x34};
+    uint8_t state[16];
     uint8_t key[16]  = {0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c};
-    //uint8_t key[16]  = {0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61};
+    transpose(input, state);
     KeyExpansion(state, key, w, Nk, Nb, Nr);
     cipher(state, w, 4, 4, 10);
 
-    /*for(i=0; i< Nb * (Nr+1); i++){
-        printf("%x", w[i]);
-    }*/
     for(i=0; i<16; i+=4){
         printf("Resultado final: %x%x%x%x, ", state[i], state[i+1], state[i+2], state[i+3]);
     }

@@ -54,6 +54,7 @@ static uint8_t xtime(uint8_t x)
 void SubBytes(uint8_t* block){
 
     int i;
+
     for(i=0; i<16; i++){
         block[i] = SubBox[block[i]];
     }
@@ -114,17 +115,21 @@ uint32_t RotWord(uint32_t value){
 void MixColumns(uint8_t* state){
 
     int i;
-    unsigned char tmpState[4];
+    unsigned char tmpState[16];
     for(i=0; i<4; i++){
         tmpState[i] = xtime(state[i]) ^ (xtime(state[i+4]) ^ state[i+4]) ^ state[i+8] ^ state[i+12];
         tmpState[i+4] = state[i] ^ xtime(state[i+4]) ^ (xtime(state[i+8]) ^ state[i+8])  ^ state[i+12];
         tmpState[i+8] = state[i] ^ state[i+4] ^ xtime(state[i+8])  ^ (xtime(state[i+12]) ^ state[i+12]);
         tmpState[i+12] = (xtime(state[i]) ^ state[i]) ^ state[i+4] ^ state[i+8]  ^ xtime(state[i+12]);
     }
+
+    for(i=0; i<16; i++){
+        state[i] = tmpState[i];
+    }
 }
 
 
-void KeyExpansion(uint8_t* key, uint32_t* w, int Nk, int Nb, int Nr){
+void KeyExpansion(uint8_t* state, uint8_t* key, uint32_t* w, int Nk, int Nb, int Nr){
     
     uint32_t temp;
     uint32_t Rcon[11] = {0x00000000, 0x01000000, 0x02000000, 0x04000000, 0x08000000, 0x10000000, 0x20000000, 0x40000000, 0x80000000, 0x1b000000, 0x36000000};
@@ -132,76 +137,81 @@ void KeyExpansion(uint8_t* key, uint32_t* w, int Nk, int Nb, int Nr){
 
     while (i < Nk){
         w[i] = ((uint32_t)key[4*i] << 24);
-        w[i] |= ((uint32_t)key[4*i+1] << 16);
-        w[i] |= ((uint32_t)key[4*i+2] << 8);
-        w[i] |= (uint32_t)key[4*i+3];
+        w[i] |= ((uint32_t)key[(4*i)+1] << 16);
+        w[i] |= ((uint32_t)key[(4*i)+2] << 8);
+        w[i] |= (uint32_t)key[(4*i)+3];
         i++;
     }
-
     i = Nk;
 
     while (i < Nb * (Nr+1)){
         temp = w[i-1];
         if(i % Nk == 0){
             temp = SubWord(RotWord(temp)) ^ Rcon[i/Nk];
-        }else if ((Nk > 6) && (i % Nk == 4)){
+        }else if ((Nk > 6) && ((i % Nk) == 4)){
             temp = SubWord(temp);
         }
-        w[i] = w[i-Nk] ^ temp;
+        w[i] = (w[i-Nk] ^ temp);
         i++;
     }
 }
 
-void AddRoundKey(uint8_t* state, uint8_t* key, uint32_t* w, int Nk, int Nb, int Nr){
+void AddRoundKey(uint8_t* state, uint32_t* w, int ind){
 
-    KeyExpansion(key, w, Nk, Nb, Nr);
 
     int i;
     uint8_t byte1, byte2, byte3, byte4;
 
     for(i=0; i<4; i++){
         
+        //printf("Word %d: %x\n", i, w[i]);
         //Disassemble word into bytes
-        byte1 = (uint8_t)(w[i] >> 24) & 0xFF;
-        byte2 = (uint8_t)(w[i] >> 16) & 0xFF;
-        byte3 = (uint8_t)(w[i] >> 8) & 0xFF; 
-        byte4 = (uint8_t)w[i] & 0xFF;
+        byte1 = (uint8_t)(w[4*ind] >> (24-8*i)) & 0xFF;
+        byte2 = (uint8_t)(w[(4*ind)+1] >> (24-8*i)) & 0xFF;
+        byte3 = (uint8_t)(w[(4*ind)+2] >> (24-8*i)) & 0xFF; 
+        byte4 = (uint8_t)(w[(4*ind)+3] >> (24-8*i)) & 0xFF;
 
-        key[4*i] = key[4*i] ^ byte1;
-        key[(4*i) + 1] = key[(4*i) + 1] ^ byte2;
-        key[(4*i) + 2] = key[(4*i) + 2] ^ byte3;
-        key[(4*i) + 3] = key[(4*i) + 3] ^ byte4;
+            
+        //printf("Bytes %d: %x%x%x%x\n", i, byte1, byte2, byte3, byte4);
+        
+        state[i] ^= byte1;
+        state[i+4] ^= byte2;
+        state[i+8] ^= byte3;
+        state[i+12] ^= byte4;
 
     }
+
 }
 
 //Cipher funtion
-void cipher(uint8_t* state, uint8_t* key, int Nk, int Nb, int Nr){
+void cipher(uint8_t* state, uint32_t* w, int Nk, int Nb, int Nr){
 
-    int i;
-    uint32_t w[4];
+    int i = 0;
 
-    AddRoundKey(state, key, w, Nk, Nb, Nr);
-    
-    for(i=0; i<Nr; i++){
+    AddRoundKey(state, w, i);
+   
+    /*printf("Round %d: ", i);
+    for(int j=0; j<16; j+=4){
+         printf(" %x%x%x%x, ", state[j], state[j+1], state[j+2], state[j+3]);
+    }
+    printf("\n");*/
+
+    for(i=1; i<Nr; i++){
         SubBytes(state);
         ShiftRows(state);
+        printf("Round %d: ", i);
+        for(int j=0; j<16; j+=4){
+            printf(" %x%x%x%x, ", state[j], state[j+1], state[j+2], state[j+3]);
+        }
+        printf("\n");
         MixColumns(state);
-        AddRoundKey(state, key, w, Nk, Nb, Nr);
+        AddRoundKey(state, w, i);
+        
     }
 
-    //------------------------------------------------
-    SubBytes(state); //SEGMENTATION FAULT
-    //------------------------------------------------
-
+    SubBytes(state); 
     ShiftRows(state);
-    AddRoundKey(state, key, w, Nk, Nb, Nr);
-
-    printf("Byte %d; %x2\n", i, state[1]);
-    for(i=0; i<16; i++){
-
-        printf("Byte %d; %x2\n", i, state[i]);
-    }
+    AddRoundKey(state, w, i);
 
 }
 
@@ -212,13 +222,15 @@ int main(int argc, char *argv[])
     
     int i=0;
     
-    uint8_t state[17];
+    //uint8_t state[17];
     //uint8_t* key;
     int key_length;
 
     int Nk=4;
     int Nb=4;
     int Nr=10;
+
+    uint32_t w[44]; //44 poreque es 128, ajustar para resto
 
     //Check correct number of arguments(file, key)
     if(argc != 3){
@@ -260,17 +272,25 @@ int main(int argc, char *argv[])
     }
 
 
-    while(fgets(state, 17, fptr)){
+    //while(fgets(state, 17, fptr)){
         /*for(i=0; i<16; i++){
             printf("%c", block[i]);
         }*/
         //cipher(fptr, state, key);
+    //}
+
+    uint8_t state[16]= {0x32, 0x43, 0xf6, 0xa8, 0x88, 0x5a, 0x30, 0x8d, 0x31, 0x31, 0x98, 0xa2, 0xe0, 0x37, 0x07, 0x34};
+    uint8_t key[16]  = {0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c};
+    //uint8_t key[16]  = {0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61};
+    KeyExpansion(state, key, w, Nk, Nb, Nr);
+    cipher(state, w, 4, 4, 10);
+
+    /*for(i=0; i< Nb * (Nr+1); i++){
+        printf("%x", w[i]);
+    }*/
+    for(i=0; i<16; i+=4){
+        printf("Resultado final: %x%x%x%x, ", state[i], state[i+1], state[i+2], state[i+3]);
     }
-
-    uint8_t sate[16]= {0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61, 0x61};
-    uint8_t key[16]= {0x31, 0x31,  0x31, 0x31, 0x31, 0x31, 0x31, 0x31, 0x31, 0x31, 0x31, 0x31, 0x31, 0x31, 0x31, 0x31};
-
-    cipher(state, key, 4, 4, 10);
 
     return 0;
 }

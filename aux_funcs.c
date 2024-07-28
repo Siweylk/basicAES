@@ -1,3 +1,5 @@
+#include <stdlib.h>
+#include <stdio.h>
 #include "./headers/aux_funcs.h"
 
 //Auxiliary functions
@@ -27,4 +29,27 @@ void ShiftN(uint8_t* row, int n){
 
 uint8_t xtime(uint8_t x){
     return ((x<<1) ^ (((x>>7) & 1) * 0x1b));
+}
+
+//Generate random IV
+void gen_random_IV(uint8_t* IV){
+
+    int i;
+    printf("El IV:");
+    for(i=0; i<16; i++){
+        //IV[i]= rand() % 256;
+        IV[i]= 0x31;
+        printf("%X", IV[i]);
+    }
+}
+
+
+//XOR two blocks(state and IV)
+void XOR_blocks(uint8_t* state, uint8_t* IV){
+
+    int i;
+
+    for(i=0; i<16; i++){
+        state[i] ^= IV[i];
+    }
 }

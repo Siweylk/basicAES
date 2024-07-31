@@ -35,11 +35,8 @@ uint8_t xtime(uint8_t x){
 void gen_random_IV(uint8_t* IV){
 
     int i;
-    printf("El IV:");
     for(i=0; i<16; i++){
-        //IV[i]= rand() % 256;
         IV[i]= 0x31;
-        printf("%X", IV[i]);
     }
 }
 

@@ -163,12 +163,9 @@ void AddPadding(uint8_t* input, int size){
 
     int i;
 
-    /*for(i=size; i<15; i++){
-        input[i] = 0x00;
+    for(i=size; i<16; i++){
+        input[i] = (uint8_t)(16-size);
     }
-    input[15] = (uint8_t) (16-size);*/
-
-    input[size]=0x01;
 }
 
 //Cipher funtion

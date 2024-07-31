@@ -14,8 +14,8 @@ int main(int argc, char *argv[])
     FILE* fptr;
     int i=0, Nb=4, Nr, Nk, inputSize;
     
-    uint8_t state[16], IV[16];
-    char input[16];
+    uint8_t state[16], IV[16], output[16];
+    char input[17];
     uint8_t* key;
     uint32_t* w;
     int key_length;
@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
 
     KeyExpansion(key, w, Nk, Nb, Nr);
     gen_random_IV(IV);
-    printf("\n");
+
 
 
     while(fgets(input, 17, fptr)){
@@ -78,24 +78,18 @@ int main(int argc, char *argv[])
         XOR_blocks(state, IV);
 
         cipher(state, w, Nr);
-        for(i=0; i<16; i++){
-            printf("%X", state[i]);
-        }
+
+        transpose(state, output);
+
         for(i=0; i<16; i++){
             IV[i] = state[i];
         }
+
+        for(i=0; i<16; i++){
+            printf("%02X", output[i]);
+        }
     }
 
-    /*uint8_t input[16]= {0x32, 0x43, 0xf6, 0xa8, 0x88, 0x5a, 0x30, 0x8d, 0x31, 0x31, 0x98, 0xa2, 0xe0, 0x37, 0x07, 0x34};
-    uint8_t state[16];
-    uint8_t key[16]  = {0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c};
-    transpose(input, state);
-    KeyExpansion(state, key, w, Nk, Nb, Nr);
-    cipher(state, w, 10);
-
-    for(i=0; i<16; i+=4){
-        printf("Resultado final2: %x%x%x%x, ", state[i], state[i+1], state[i+2], state[i+3]);
-    }*/
 
     return 0;
 }

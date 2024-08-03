@@ -169,7 +169,7 @@ void AddPadding(uint8_t* input, int size){
 }
 
 //Cipher funtion
-void cipher(uint8_t* state, uint32_t* w, int Nr){
+void Cipher(uint8_t* state, uint32_t* w, int Nr){
     
     int i = 0;
 

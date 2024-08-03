@@ -6,19 +6,20 @@
 #include <string.h>
 
 #include "./headers/cipher.h"
+#include "./headers/invCipher.h"
 #include "./headers/aux_funcs.h"
 
 
 int main(int argc, char *argv[])
 {
-    FILE* fptr;
-    int i=0, Nb=4, Nr, Nk, inputSize;
+    FILE* in_file, out_file;
+    int i=0, Nb=4, Nr, Nk, inputSize, key_length;
     
-    uint8_t state[16], IV[16], output[16];
-    char input[17];
+    uint8_t state[16], IV[16], input[16], output[16];
+    uint8_t mode;
+
     uint8_t* key;
     uint32_t* w;
-    int key_length;
 
     //Check correct number of arguments(file, key)
     if(argc != 3){
@@ -54,40 +55,60 @@ int main(int argc, char *argv[])
     }
 
     //Open file to be encrypted and check if exists
-    fptr = fopen(argv[1], "rb");
-    if(fptr == NULL){
+    in_file = fopen(argv[1], "rb");
+    if(in_file == NULL){
         perror("Error");
         printf("The file does not exist or can not be opened");
         exit(1);
     }
 
+    //scanf("Select")
+
     KeyExpansion(key, w, Nk, Nb, Nr);
-    gen_random_IV(IV);
+    Gen_random_IV(IV);
 
 
 
-    while(fgets(input, 17, fptr)){
-
+    while(fgets(input, 17, in_file)){
+    //while(fread(input, 1, 16, in_file)){ //NO AÑADE PADDING
         inputSize = strlen(input);
         if(inputSize<16){
             AddPadding(input, inputSize);//MIRAR COMO TRATA LOS SALTOS DE LINEA
         }
 
-        transpose(input, state);
-
+        Transpose(input, state);
+        printf("Texto sin cifrar: ");
+        for(i=0; i<16; i++){
+            printf("%02X", state[i]);
+        }
+        printf("\n");
         XOR_blocks(state, IV);
 
-        cipher(state, w, Nr);
+        Cipher(state, w, Nr);
 
-        transpose(state, output);
-
+        printf("\n");
+        //Update IV for next round
         for(i=0; i<16; i++){
             IV[i] = state[i];
         }
 
+        //transpose(state, output);
+
+        //REstore the IV to decrypt the file
+        Gen_random_IV(IV);
+        //TEST DECRYPTION
+        InvCipher(state, w, Nr);
+        XOR_blocks(state, IV);
+        printf("Texto descifrado: ");
         for(i=0; i<16; i++){
+            printf("%02X", state[i]);
+        }
+        printf("\n");
+
+        /*for(i=0; i<16; i++){
             printf("%02X", output[i]);
         }
+        printf("\n");*/
     }
 
 

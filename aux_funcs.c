@@ -3,7 +3,7 @@
 #include "./headers/aux_funcs.h"
 
 //Auxiliary functions
-void transpose(uint8_t* input, uint8_t* state){
+void Transpose(uint8_t* input, uint8_t* state){
 
     int i;
 
@@ -32,7 +32,7 @@ uint8_t xtime(uint8_t x){
 }
 
 //Generate random IV
-void gen_random_IV(uint8_t* IV){
+void Gen_random_IV(uint8_t* IV){
 
     int i;
     for(i=0; i<16; i++){
@@ -49,4 +49,13 @@ void XOR_blocks(uint8_t* state, uint8_t* IV){
     for(i=0; i<16; i++){
         state[i] ^= IV[i];
     }
+}
+
+//Multiplies two bytes, stolen from @kokke /tiny-AES-c
+uint8_t Multiply(uint8_t x, uint8_t y){
+    return (((y & 1) * x) ^
+       ((y>>1 & 1) * xtime(x)) ^
+       ((y>>2 & 1) * xtime(xtime(x))) ^
+       ((y>>3 & 1) * xtime(xtime(xtime(x)))) ^
+       ((y>>4 & 1) * xtime(xtime(xtime(xtime(x))))));
 }

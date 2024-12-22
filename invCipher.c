@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "./headers/invCipher.h"
 #include "./headers/cipher.h"
@@ -61,19 +62,27 @@ void InvMixColumns(uint8_t* state){
 
 void InvCipher(uint8_t* state, uint32_t* w, int Nr){
 
-    int i = Nr;
+    int i=Nr;
+    int j=0;
+
 
     AddRoundKey(state, w, i);
-
+    
     for(i=Nr-1; i>0; i--){
+
         InvShiftRows(state);
+
         InvSubBytes(state);
+
         AddRoundKey(state, w, i);
+
         InvMixColumns(state);
     }
 
     InvShiftRows(state);
+
     InvSubBytes(state);
+
     AddRoundKey(state, w, i);
 
 }

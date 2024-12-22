@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "./headers/aux_funcs.h"
 
 //Auxiliary functions
@@ -58,4 +59,18 @@ uint8_t Multiply(uint8_t x, uint8_t y){
        ((y>>2 & 1) * xtime(xtime(x))) ^
        ((y>>3 & 1) * xtime(xtime(xtime(x)))) ^
        ((y>>4 & 1) * xtime(xtime(xtime(xtime(x))))));
+}
+
+//Check if extension is .ciph
+int checkExt(char* name){
+    
+    int size = strlen(name);
+    
+    if(name[size-5] == '.' && name[size-4] == 'c' && name[size-3] == 'i' && name[size-2] == 'p' && name[size-1] == 'h'){
+        return 1;
+    }
+    else{
+        printf("The file doesn't have the neccessary extension\n");
+        return 0;
+    }
 }

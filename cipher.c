@@ -138,8 +138,9 @@ void KeyExpansion( uint8_t* key, uint32_t* w, int Nk, int Nb, int Nr){
 
 void AddRoundKey(uint8_t* state, uint32_t* w, int ind){
 
-    int i;
+    int i, j;
     uint8_t byte1, byte2, byte3, byte4;
+    uint8_t prueba[16];
 
     for(i=0; i<4; i++){
         
@@ -155,6 +156,11 @@ void AddRoundKey(uint8_t* state, uint32_t* w, int ind){
         state[4*i+2] ^= byte3;
         state[4*i+3] ^= byte4;
 
+        //TEST TO FIND ERROR
+        prueba[4*i] = byte1;
+        prueba[4*i+1] = byte2;
+        prueba[4*i+2] = byte3;
+        prueba[4*i+3] = byte4;
     }
 }
 
@@ -171,7 +177,7 @@ void AddPadding(uint8_t* input, int size){
 //Cipher funtion
 void Cipher(uint8_t* state, uint32_t* w, int Nr){
     
-    int i = 0;
+    int j, i = 0;
 
     AddRoundKey(state, w, i);
 
